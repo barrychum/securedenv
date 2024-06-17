@@ -1,20 +1,19 @@
-### SecuredEnvSync README
-
 # SecuredEnvSync
 
-**SecuredEnvSync** is a cross-platform tool for securely managing and synchronizing encrypted environment variables. This project leverages ECC encryption to protect sensitive information and uses rclone to sync the encrypted data with Google Drive.
+**SecuredEnvSync** is a cross-platform tool for securely managing and synchronizing encrypted environment variables. This project leverages ECC encryption to protect sensitive information and uses rclone to sync the encrypted data with any rclone supported targets.
 
 ## Features
 
 - **Cross-Platform**: Works on macOS, Linux, and Windows.
 - **ECC Encryption**: Uses Elliptic Curve Cryptography (ECC) for secure encryption and decryption of environment variable values.
-- **Google Drive Sync**: Utilizes rclone to sync the encrypted environment file with Google Drive.
+- **Flexible Sync**: Utilizes rclone to sync the encrypted environment file with various cloud storage providers (Google Drive, Dropbox, OneDrive, etc.).
 - **Custom Scripts**: Provides custom scripts for encryption, decryption, and synchronization.
+- **Security**: Ensures sensitive data is encrypted and securely stored.
 
 ## Requirements
 
 - **OpenSSL**: For generating ECC keys and performing encryption/decryption.
-- **rclone**: For syncing the environment file with Google Drive.
+- **rclone**: For syncing the environment file with cloud storage providers.
 - **Bash**: For macOS and Linux scripts.
 - **PowerShell**: For Windows scripts.
 
@@ -33,7 +32,25 @@ brew install openssl          # macOS (with Homebrew)
 
 #### Windows
 
-Download and install OpenSSL from [OpenSSL for Windows](https://slproweb.com/products/Win32OpenSSL.html).
+You can install OpenSSL using either `winget` or `Chocolatey`.
+
+**Using winget**:
+```powershell
+# Search for OpenSSL
+winget search openssl
+
+# Install OpenSSL
+winget install ShiningLight.OpenSSL
+```
+
+**Using Chocolatey**:
+```powershell
+# Install OpenSSL
+choco install openssl
+
+# Confirm installation
+choco list --local-only openssl
+```
 
 ### rclone
 
@@ -98,164 +115,10 @@ New-Item -Path $env:USERPROFILE\AppData\Local\sec_env\sec_env -ItemType File
 
 ## Usage
 
-### macOS and Linux Script
+Refer to the provided scripts for usage examples. These scripts handle encryption, decryption, and synchronization of environment variables.
 
-```bash
-#!/bin/bash
-
-# Paths
-SEC_ENV_PATH="$HOME/.config/sec_env/sec_env"
-PRIVATE_KEY_PATH="$HOME/.ssh/ecc_private_key.pem"
-PUBLIC_KEY_PATH="$HOME/.ssh/ecc_public_key.pem"
-RCLONE_REMOTE="remote:backup"
-
-# Encrypt a value using ECC public key
-encrypt_value() {
-    local value=$1
-    echo -n "$value" | openssl pkeyutl -encrypt -inkey "$PUBLIC_KEY_PATH" -pubin -pkeyopt ec_scheme:ecdh | base64
-}
-
-# Decrypt a value using ECC private key
-decrypt_value() {
-    local encrypted_value=$1
-    echo "$encrypted_value" | base64 --decode | openssl pkeyutl -decrypt -inkey "$PRIVATE_KEY_PATH"
-}
-
-# Add a key-value pair to sec_env
-add_key_value() {
-    local key=$1
-    local value=$2
-    local encrypted_value=$(encrypt_value "$value")
-    echo "$key=$encrypted_value" >> "$SEC_ENV_PATH"
-}
-
-# Retrieve a value from sec_env
-get_value() {
-    local key=$1
-    local encrypted_value=$(grep "^$key=" "$SEC_ENV_PATH" | cut -d '=' -f 2)
-    decrypt_value "$encrypted_value"
-}
-
-# Sync sec_env from Google Drive
-sync_sec_env_down() {
-    if rclone copy "$RCLONE_REMOTE/sec_env" "$(dirname "$SEC_ENV_PATH")"; then
-        echo "sec_env downloaded successfully."
-    else
-        echo "Failed to download sec_env." >&2
-        exit 1
-    fi
-}
-
-# Async sync sec_env to Google Drive
-sync_sec_env_up() {
-    if rclone copy "$SEC_ENV_PATH" "$RCLONE_REMOTE"; then
-        echo "sec_env uploaded successfully."
-    else
-        echo "Failed to upload sec_env." >&2
-        exit 1
-    fi &
-}
-
-# Example usage
-sync_sec_env_down
-add_key_value "API_KEY" "my-secret-api-key"
-sync_sec_env_up
-
-# Wait for background tasks to complete before exiting
-wait
-
-value=$(get_value "API_KEY")
-echo "Decrypted value: $value"
-```
-
-### Windows PowerShell Script
-
-```powershell
-# Paths
-$secEnvPath = "C:\Users\$env:USERNAME\AppData\Local\sec_env\sec_env"
-$privateKeyPath = "C:\Users\$env:USERNAME\.ssh\ecc_private_key.pem"
-$publicKeyPath = "C:\Users\$env:USERNAME\.ssh\ecc_public_key.pem"
-$rcloneRemote = "remote:backup"
-
-# Encrypt a value using ECC public key
-function Encrypt-Value {
-    param (
-        [string]$value
-    )
-    $encryptedValue = echo -n "$value" | openssl pkeyutl -encrypt -inkey $publicKeyPath -pubin -pkeyopt ec_scheme:ecdh | base64
-    return $encryptedValue
-}
-
-# Decrypt a value using ECC private key
-function Decrypt-Value {
-    param (
-        [string]$encryptedValue
-    )
-    $decryptedValue = echo "$encryptedValue" | base64 --decode | openssl pkeyutl -decrypt -inkey $privateKeyPath
-    return $decryptedValue
-}
-
-# Add a key-value pair to sec_env
-function Add-KeyValue {
-    param (
-        [string]$key,
-        [string]$value
-    )
-    $encryptedValue = Encrypt-Value -value $value
-    "$key=$encryptedValue" | Out-File -FilePath $secEnvPath -Append
-}
-
-# Retrieve a value from sec_env
-function Get-Value {
-    param (
-        [string]$key
-    )
-    $line = Select-String -Path $secEnvPath -Pattern "^$key=" -SimpleMatch
-    if ($line) {
-        $encryptedValue = $line -replace "^$key=", ""
-        $decryptedValue = Decrypt-Value -encryptedValue $encryptedValue
-        return $decryptedValue
-    } else {
-        Write-Error "Key not found"
-    }
-}
-
-# Sync sec_env from Google Drive
-function Sync-SecEnvDown {
-    $result = rclone copy $rcloneRemote\sec_env (Split-Path -Parent $secEnvPath)
-    if ($LASTEXITCODE -eq 0) {
-        Write-Output "sec_env downloaded successfully."
-    } else {
-        Write-Error "Failed to download sec_env."
-        exit 1
-    }
-}
-
-# Async sync sec_env to Google Drive
-function Sync-SecEnvUp {
-    Start-Job -ScriptBlock {
-        rclone copy $using:secEnvPath $using:rcloneRemote
-        if ($LASTEXITCODE -eq 0) {
-            Write-Output "sec_env uploaded successfully."
-        } else {
-            Write-Error "Failed to upload sec_env."
-            exit 1
-        }
-    } | Wait-Job
-}
-
-# Example usage
-Sync-SecEnvDown
-Add-KeyValue -key "API_KEY" -value "my-secret-api-key"
-Sync-SecEnvUp
-
-$value = Get-Value -key "API_KEY"
-Write-Output "Decrypted value: $value"
-```
-
-## Contributing
-
-Contributions are welcome! Please fork this repository and submit a pull request for any changes or improvements.
+- **macOS and Linux Script**: See [bash_script.sh](scripts/bash_script.sh)
+- **Windows PowerShell Script**: See [powershell_script.ps1](scripts/powershell_script.ps1)
 
 ## License
 
