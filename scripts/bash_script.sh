@@ -1,7 +1,9 @@
 #!/bin/bash
 
 # Paths
-SEC_ENV_PATH="$HOME/.config/sec_env/sec_env"
+CONFIG_DIR="$HOME/.config/sec_env"
+SEC_ENV_PATH="$CONFIG_DIR/sec_env"
+LOG_PATH="$CONFIG_DIR/sync.log"
 PRIVATE_KEY_PATH="$HOME/.ssh/rsa_private_key.pem"
 PUBLIC_KEY_PATH="$HOME/.ssh/rsa_public_key.pem"
 RCLONE_REMOTE="remote:backup"
@@ -38,37 +40,42 @@ add_key_value() {
 # Retrieve a value from sec_env
 get_value() {
     local key=$1
-    local encrypted_value=$(grep "^$key=" "$SEC_ENV_PATH" | cut -d '=' -f 2)
-    decrypt_value "$encrypted_value"
-}
-
-# Sync sec_env from remote storage
-sync_sec_env_down() {
-    if rclone copy "$RCLONE_REMOTE/sec_env" "$(dirname "$SEC_ENV_PATH")"; then
-        echo "sec_env downloaded successfully."
+    if grep -q "^$key=" "$SEC_ENV_PATH"; then
+        local line=$(awk -F= -v k="$key" '$1 == k {print $0}' "$SEC_ENV_PATH")
+        local encrypted_value=${line#*=}
+        decrypt_value "$encrypted_value"
     else
-        echo "Failed to download sec_env." >&2
-        exit 1
+        echo -n ""
     fi
 }
 
-# Async sync sec_env to remote storage
-sync_sec_env_up() {
-    if rclone copy "$SEC_ENV_PATH" "$RCLONE_REMOTE"; then
-        echo "sec_env uploaded successfully."
-    else
-        echo "Failed to upload sec_env." >&2
-        exit 1
-    fi &
+# Sync sec_env from remote storage silently and log output
+sync_sec_env_down() {
+    {
+        rclone copy "$RCLONE_REMOTE/sec_env" "$(dirname "$SEC_ENV_PATH")" && echo "$(date): sec_env downloaded successfully." || echo "$(date): Failed to download sec_env." >&2
+    } &>> "$LOG_PATH"
 }
 
-# Example usage
-sync_sec_env_down
-add_key_value "API_KEY" "my-secret-api-key"
-sync_sec_env_up
+# Async sync sec_env to remote storage silently and log output
+sync_sec_env_up() {
+    (
+        rclone copy "$SEC_ENV_PATH" "$RCLONE_REMOTE" &
+        wait $!
+        if [[ $? -eq 0 ]]; then
+            echo "$(date): sec_env uploaded successfully."
+        else
+            echo "$(date): Failed to upload sec_env." >&2
+        fi
+    ) &>> "$LOG_PATH" &
+}
 
-# Wait for background tasks to complete before exiting
-wait
+# Example usage (commented out for sourcing)
+# sync_sec_env_down
+# add_key_value "API_KEY" "my-secret-api-key"
+# sync_sec_env_up
 
-value=$(get_value "API_KEY")
-echo "Decrypted value: $value"
+# Wait for background tasks to complete before exiting (commented out for sourcing)
+# wait
+
+# value=$(get_value "API_KEY")
+# echo "Decrypted value: $value"

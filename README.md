@@ -74,9 +74,7 @@ Download and install rclone from [rclone downloads](https://rclone.org/downloads
 openssl genpkey -algorithm RSA -out rsa_private_key.pem -pkeyopt rsa_keygen_bits:2048
 
 # Generate the RSA public key
-openssl rsa -pubout -in rsa_private_key.pem -out rsa_public
-
-_key.pem
+openssl rsa -pubout -in rsa_private_key.pem -out rsa_public_key.pem
 ```
 
 2. **Move the Keys to Appropriate Locations**
