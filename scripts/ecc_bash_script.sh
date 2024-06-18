@@ -2,37 +2,28 @@
 
 # Paths
 SEC_ENV_PATH="$HOME/.config/sec_env/sec_env"
-PRIVATE_KEY_PATH="$HOME/.ssh/rsa_private_key.pem"
-PUBLIC_KEY_PATH="$HOME/.ssh/rsa_public_key.pem"
+PRIVATE_KEY_PATH="$HOME/.ssh/ecc_private_key.pem"
+PUBLIC_KEY_PATH="$HOME/.ssh/ecc_public_key.pem"
 RCLONE_REMOTE="remote:backup"
 
-# Encrypt a value using RSA public key
+# Encrypt a value using ECC public key
 encrypt_value() {
     local value=$1
-    echo -n "$value" | openssl pkeyutl -encrypt -pubin -inkey "$PUBLIC_KEY_PATH" | base64
+    echo -n "$value" | openssl pkeyutl -encrypt -inkey "$PUBLIC_KEY_PATH" -pubin -pkeyopt ec_scheme:ecdh | base64
 }
 
-# Decrypt a value using RSA private key
+# Decrypt a value using ECC private key
 decrypt_value() {
     local encrypted_value=$1
     echo "$encrypted_value" | base64 --decode | openssl pkeyutl -decrypt -inkey "$PRIVATE_KEY_PATH"
 }
 
-# Add or replace a key-value pair in sec_env
+# Add a key-value pair to sec_env
 add_key_value() {
     local key=$1
     local value=$2
     local encrypted_value=$(encrypt_value "$value")
-
-    # Create sec_env file if it doesn't exist
-    touch "$SEC_ENV_PATH"
-
-    # Check if key exists and replace its value
-    if grep -q "^$key=" "$SEC_ENV_PATH"; then
-        sed -i "" "s|^$key=.*|$key=$encrypted_value|" "$SEC_ENV_PATH"
-    else
-        echo "$key=$encrypted_value" >> "$SEC_ENV_PATH"
-    fi
+    echo "$key=$encrypted_value" >> "$SEC_ENV_PATH"
 }
 
 # Retrieve a value from sec_env
@@ -42,7 +33,7 @@ get_value() {
     decrypt_value "$encrypted_value"
 }
 
-# Sync sec_env from remote storage
+# Sync sec_env from Google Drive
 sync_sec_env_down() {
     if rclone copy "$RCLONE_REMOTE/sec_env" "$(dirname "$SEC_ENV_PATH")"; then
         echo "sec_env downloaded successfully."
@@ -52,7 +43,7 @@ sync_sec_env_down() {
     fi
 }
 
-# Async sync sec_env to remote storage
+# Async sync sec_env to Google Drive
 sync_sec_env_up() {
     if rclone copy "$SEC_ENV_PATH" "$RCLONE_REMOTE"; then
         echo "sec_env uploaded successfully."
