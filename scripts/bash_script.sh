@@ -60,13 +60,12 @@ sync_sec_env_down() {
 sync_sec_env_up() {
     (
         rclone copy "$SEC_ENV_PATH" "$RCLONE_REMOTE" &
-        wait $!
         if [[ $? -eq 0 ]]; then
             echo "$(date): sec_env uploaded successfully."
         else
             echo "$(date): Failed to upload sec_env." >&2
         fi
-    ) &>> "$LOG_PATH" &
+    ) &>> "$LOG_PATH"
 }
 
 # Example usage (commented out for sourcing)
