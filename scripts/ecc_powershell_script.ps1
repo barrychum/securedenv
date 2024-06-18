@@ -1,19 +1,19 @@
 # Paths
 $secEnvPath = "C:\Users\$env:USERNAME\AppData\Local\sec_env\sec_env"
-$privateKeyPath = "C:\Users\$env:USERNAME\.ssh\rsa_private_key.pem"
-$publicKeyPath = "C:\Users\$env:USERNAME\.ssh\rsa_public_key.pem"
+$privateKeyPath = "C:\Users\$env:USERNAME\.ssh\ecc_private_key.pem"
+$publicKeyPath = "C:\Users\$env:USERNAME\.ssh\ecc_public_key.pem"
 $rcloneRemote = "remote:backup"
 
-# Encrypt a value using RSA public key
+# Encrypt a value using ECC public key
 function Encrypt-Value {
     param (
         [string]$value
     )
-    $encryptedValue = echo -n "$value" | openssl pkeyutl -encrypt -pubin -inkey $publicKeyPath | base64
+    $encryptedValue = echo -n "$value" | openssl pkeyutl -encrypt -inkey $publicKeyPath -pubin -pkeyopt ec_scheme:ecdh | base64
     return $encryptedValue
 }
 
-# Decrypt a value using RSA private key
+# Decrypt a value using ECC private key
 function Decrypt-Value {
     param (
         [string]$encryptedValue
@@ -22,35 +22,14 @@ function Decrypt-Value {
     return $decryptedValue
 }
 
-# Add or replace a key-value pair in sec_env
+# Add a key-value pair to sec_env
 function Add-KeyValue {
     param (
         [string]$key,
         [string]$value
     )
     $encryptedValue = Encrypt-Value -value $value
-
-    # Create sec_env file if it doesn't exist
-    if (-not (Test-Path $secEnvPath)) {
-        New-Item -ItemType File -Path $secEnvPath
-    }
-
-    # Check if key exists and replace its value
-    $content = Get-Content $secEnvPath
-    $keyExists = $false
-    $newContent = @()
-    foreach ($line in $content) {
-        if ($line -match "^$key=") {
-            $newContent += "$key=$encryptedValue"
-            $keyExists = $true
-        } else {
-            $newContent += $line
-        }
-    }
-    if (-not $keyExists) {
-        $newContent += "$key=$encryptedValue"
-    }
-    $newContent | Set-Content $secEnvPath
+    "$key=$encryptedValue" | Out-File -FilePath $secEnvPath -Append
 }
 
 # Retrieve a value from sec_env
@@ -68,7 +47,7 @@ function Get-Value {
     }
 }
 
-# Sync sec_env from remote storage
+# Sync sec_env from Google Drive
 function Sync-SecEnvDown {
     $result = rclone copy $rcloneRemote\sec_env (Split-Path -Parent $secEnvPath)
     if ($LASTEXITCODE -eq 0) {
@@ -79,7 +58,7 @@ function Sync-SecEnvDown {
     }
 }
 
-# Async sync sec_env to remote storage
+# Async sync sec_env to Google Drive
 function Sync-SecEnvUp {
     Start-Job -ScriptBlock {
         rclone copy $using:secEnvPath $using:rcloneRemote

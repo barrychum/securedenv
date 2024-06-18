@@ -1,18 +1,18 @@
 # SecuredEnvSync
 
-**SecuredEnvSync** is a cross-platform tool for securely managing and synchronizing encrypted environment variables. This project leverages ECC encryption to protect sensitive information and uses rclone to sync the encrypted data with any rclone supported targets.
+**SecuredEnvSync** is a cross-platform tool for securely managing and synchronizing encrypted environment variables. This project leverages RSA encryption to protect sensitive information and uses rclone to sync the encrypted data with any rclone supported targets.
 
 ## Features
 
 - **Cross-Platform**: Works on macOS, Linux, and Windows.
-- **ECC Encryption**: Uses Elliptic Curve Cryptography (ECC) for secure encryption and decryption of environment variable values.
+- **RSA Encryption**: Uses RSA encryption for secure encryption and decryption of environment variable values.
 - **Flexible Sync**: Utilizes rclone to sync the encrypted environment file with various cloud storage providers (Google Drive, Dropbox, OneDrive, etc.).
 - **Custom Scripts**: Provides custom scripts for encryption, decryption, and synchronization.
 - **Security**: Ensures sensitive data is encrypted and securely stored.
 
 ## Requirements
 
-- **OpenSSL**: For generating ECC keys and performing encryption/decryption.
+- **OpenSSL**: For generating RSA keys and performing encryption/decryption.
 - **rclone**: For syncing the environment file with cloud storage providers.
 - **Bash**: For macOS and Linux scripts.
 - **PowerShell**: For Windows scripts.
@@ -67,14 +67,16 @@ Download and install rclone from [rclone downloads](https://rclone.org/downloads
 
 ## Setup
 
-1. **Generate ECC Key Pair**
+1. **Generate RSA Key Pair**
 
 ```sh
-# Generate the ECC private key
-openssl ecparam -genkey -name prime256v1 -noout -out ecc_private_key.pem
+# Generate the RSA private key
+openssl genpkey -algorithm RSA -out rsa_private_key.pem -pkeyopt rsa_keygen_bits:2048
 
-# Generate the ECC public key
-openssl ec -in ecc_private_key.pem -pubout -out ecc_public_key.pem
+# Generate the RSA public key
+openssl rsa -pubout -in rsa_private_key.pem -out rsa_public
+
+_key.pem
 ```
 
 2. **Move the Keys to Appropriate Locations**
@@ -83,16 +85,16 @@ openssl ec -in ecc_private_key.pem -pubout -out ecc_public_key.pem
 
 ```sh
 # Move the keys to the .ssh directory
-mv ecc_private_key.pem ~/.ssh/
-mv ecc_public_key.pem ~/.ssh/
+mv rsa_private_key.pem ~/.ssh/
+mv rsa_public_key.pem ~/.ssh/
 ```
 
 #### Windows
 
 ```powershell
 # Move the keys to the .ssh directory
-Move-Item ecc_private_key.pem $env:USERPROFILE\.ssh\
-Move-Item ecc_public_key.pem $env:USERPROFILE\.ssh\
+Move-Item rsa_private_key.pem $env:USERPROFILE\.ssh\
+Move-Item rsa_public_key.pem $env:USERPROFILE\.ssh\
 ```
 
 3. **Create the sec_env File**
