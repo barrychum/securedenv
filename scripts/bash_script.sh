@@ -1,7 +1,9 @@
 #!/bin/bash
 
 # Paths
-SEC_ENV_PATH="$HOME/.config/sec_env/sec_env"
+CONFIG_DIR="$HOME/.config/sec_env"
+SEC_ENV_PATH="$CONFIG_DIR/sec_env"
+LOG_PATH="$CONFIG_DIR/sync.log"
 PRIVATE_KEY_PATH="$HOME/.ssh/rsa_private_key.pem"
 PUBLIC_KEY_PATH="$HOME/.ssh/rsa_public_key.pem"
 RCLONE_REMOTE="remote:backup"
@@ -38,37 +40,32 @@ add_key_value() {
 # Retrieve a value from sec_env
 get_value() {
     local key=$1
-    local encrypted_value=$(grep "^$key=" "$SEC_ENV_PATH" | cut -d '=' -f 2)
+    local line=$(awk -F= -v k="$key" '$1 == k {print $0}' "$SEC_ENV_PATH")
+    local encrypted_value=${line#*=}
     decrypt_value "$encrypted_value"
 }
 
-# Sync sec_env from remote storage
+# Sync sec_env from remote storage silently and log output
 sync_sec_env_down() {
-    if rclone copy "$RCLONE_REMOTE/sec_env" "$(dirname "$SEC_ENV_PATH")"; then
-        echo "sec_env downloaded successfully."
-    else
-        echo "Failed to download sec_env." >&2
-        exit 1
-    fi
+    {
+        rclone copy "$RCLONE_REMOTE/sec_env" "$(dirname "$SEC_ENV_PATH")" && echo "$(date): sec_env downloaded successfully." || echo "$(date): Failed to download sec_env." >&2
+    } &>> "$LOG_PATH"
 }
 
-# Async sync sec_env to remote storage
+# Async sync sec_env to remote storage silently and log output
 sync_sec_env_up() {
-    if rclone copy "$SEC_ENV_PATH" "$RCLONE_REMOTE"; then
-        echo "sec_env uploaded successfully."
-    else
-        echo "Failed to upload sec_env." >&2
-        exit 1
-    fi &
+    {
+        rclone copy "$SEC_ENV_PATH" "$RCLONE_REMOTE" && echo "$(date): sec_env uploaded successfully." || echo "$(date): Failed to upload sec_env." >&2
+    } &>> "$LOG_PATH" & disown
 }
 
-# Example usage
-sync_sec_env_down
-add_key_value "API_KEY" "my-secret-api-key"
-sync_sec_env_up
+# Example usage (commented out for sourcing)
+# sync_sec_env_down
+# add_key_value "API_KEY" "my-secret-api-key"
+# sync_sec_env_up
 
-# Wait for background tasks to complete before exiting
-wait
+# Wait for background tasks to complete before exiting (commented out for sourcing)
+# wait
 
-value=$(get_value "API_KEY")
-echo "Decrypted value: $value"
+# value=$(get_value "API_KEY")
+# echo "Decrypted value: $value"
