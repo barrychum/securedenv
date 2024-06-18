@@ -113,6 +113,58 @@ New-Item -Path $env:USERPROFILE\AppData\Local\sec_env -ItemType Directory
 New-Item -Path $env:USERPROFILE\AppData\Local\sec_env\sec_env -ItemType File
 ```
 
+## Architecture
+
+The following diagram illustrates the architecture and data flow of the SecuredEnvSync project:
+!["alternative text"](images/dataflow.png)
+
+<!--
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#bbf0ba', 'edgeLabelBackground':'#fff', 'clusterBkg': '#f5f5f5', 'clusterBorder': '#333'}}}%%
+graph TB
+    user[User]
+    rcloneTarget[Rclone Target]
+
+    subgraph SecuredEnvSync
+        direction TB
+
+        subgraph KeyManagement
+            direction TB
+            privateKey[Private Key]
+            publicKey[Public Key]
+        end
+
+        addKeyValue[add_key_value Function]
+        getValue[get_value Function]
+        secEnvFile[sec_env File]
+    end
+
+    user --|add key| addKeyValue 
+    user --|get value| getValue 
+    addKeyValue --|uses| publicKey
+    getValue --|uses| privateKey
+    addKeyValue --|updates| secEnvFile
+    getValue --|retrieves from| secEnvFile
+    secEnvFile --|syncs to| rcloneTarget
+    rcloneTarget --|retrieves from| secEnvFile
+```
+
+
+### Explanation of the Diagram
+
+- **User**:
+  - Adds keys through the `add_key_value` function and retrieves values through the `get_value` function.
+- **Public Key**:
+  - Used by the `add_key_value` function to encrypt data.
+- **Private Key**:
+  - Used by the `get_value` function to decrypt data.
+- **sec_env File**:
+  - Updated by the `add_key_value` function and read by the `get_value` function.
+  - Synchronized to the rclone target.
+- **Rclone Target**:
+  - Receives the synchronized `sec_env` file and provides it back when needed.
+-->
+
 ## Usage
 
 Refer to the provided scripts for usage examples. These scripts handle encryption, decryption, and synchronization of environment variables.
@@ -123,3 +175,5 @@ Refer to the provided scripts for usage examples. These scripts handle encryptio
 ## License
 
 This project is licensed under the MIT License. See the LICENSE file for details.
+
+This updated README includes the diagram in the "Architecture" section, providing a clear visual representation of the data flow and relationships between the components in the SecuredEnvSync project.
