@@ -40,9 +40,13 @@ add_key_value() {
 # Retrieve a value from sec_env
 get_value() {
     local key=$1
-    local line=$(awk -F= -v k="$key" '$1 == k {print $0}' "$SEC_ENV_PATH")
-    local encrypted_value=${line#*=}
-    decrypt_value "$encrypted_value"
+    if grep -q "^$key=" "$SEC_ENV_PATH"; then
+        local line=$(awk -F= -v k="$key" '$1 == k {print $0}' "$SEC_ENV_PATH")
+        local encrypted_value=${line#*=}
+        decrypt_value "$encrypted_value"
+    else
+        echo -n ""
+    fi
 }
 
 # Sync sec_env from remote storage silently and log output
@@ -54,9 +58,15 @@ sync_sec_env_down() {
 
 # Async sync sec_env to remote storage silently and log output
 sync_sec_env_up() {
-    {
-        rclone copy "$SEC_ENV_PATH" "$RCLONE_REMOTE" && echo "$(date): sec_env uploaded successfully." || echo "$(date): Failed to upload sec_env." >&2
-    } &>> "$LOG_PATH" & disown
+    (
+        rclone copy "$SEC_ENV_PATH" "$RCLONE_REMOTE" &
+        wait $!
+        if [[ $? -eq 0 ]]; then
+            echo "$(date): sec_env uploaded successfully."
+        else
+            echo "$(date): Failed to upload sec_env." >&2
+        fi
+    ) &>> "$LOG_PATH" &
 }
 
 # Example usage (commented out for sourcing)
